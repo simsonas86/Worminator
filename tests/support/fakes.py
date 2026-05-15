@@ -42,6 +42,19 @@ class FakeTask:
         self.cancelled = True
 
 
+class FakeReadyChat:
+    def __init__(self):
+        self.joined_rooms = []
+
+    async def join_room(self, channel):
+        self.joined_rooms.append(channel)
+
+
+class FakeReadyEvent:
+    def __init__(self):
+        self.chat = FakeReadyChat()
+
+
 class MessageRecorder:
     def __init__(self):
         self.messages = []
