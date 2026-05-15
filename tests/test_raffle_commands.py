@@ -1,8 +1,8 @@
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from tests.support.dependency_stubs import install_test_environment
-from tests.support.fakes import FakeBot, FakeCommand
+from tests.support.fakes import FakeBot, FakeCommand, FakeTask
 
 
 install_test_environment()
@@ -165,3 +165,86 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         func, args = bot.db_calls[0]
         self.assertIs(func, raffle_module.postgres.get_user_tickets)
         self.assertEqual(args, (bot.pool, 7))
+
+    async def test_ExtendCommand_WhenRaffleOpen_ShouldExtendRaffleAndReply(self):
+        bot = FakeBot()
+        command = FakeCommand(parameter="30")
+        active_raffle = Raffle()
+        active_raffle.open = True
+        active_raffle.extend = Mock()
+        raffle_module.raffle = active_raffle
+        commands = raffle_module.make_commands(bot)
+
+        await commands["extend"](command)
+
+        active_raffle.extend.assert_called_once_with(30)
+        self.assertEqual(command.replies, ["Raffle extended by 30 seconds!"])
+
+    async def test_ClearCommand_WhenRaffleExists_ShouldClearEntriesAndClaims(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        active_raffle = Raffle()
+        active_raffle.users["Entries"] = {1: "alice"}
+        active_raffle.users["Claims"] = {2: "bob"}
+        raffle_module.raffle = active_raffle
+        commands = raffle_module.make_commands(bot)
+
+        await commands["clear"](command)
+
+        self.assertEqual(active_raffle.users["Entries"], {})
+        self.assertEqual(active_raffle.users["Claims"], {})
+        self.assertEqual(command.replies, ["Raffle entries and claims have been cleared."])
+
+    async def test_ForceEndCommand_WhenRaffleOpen_ShouldCancelTimerAndCloseRaffle(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        task = FakeTask()
+        active_raffle = Raffle()
+        active_raffle.open = True
+        active_raffle.task = task
+        active_raffle.close = AsyncMock()
+        raffle_module.raffle = active_raffle
+        commands = raffle_module.make_commands(bot)
+
+        await commands["forceend"](command)
+
+        self.assertTrue(task.cancelled)
+        active_raffle.close.assert_awaited_once_with(command.reply, bot.pool)
+
+    async def test_RedrawCommand_WhenRaffleExists_ShouldRedrawWithPool(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        active_raffle = Raffle()
+        active_raffle.redraw = AsyncMock()
+        raffle_module.raffle = active_raffle
+        commands = raffle_module.make_commands(bot)
+
+        await commands["redraw"](command)
+
+        active_raffle.redraw.assert_awaited_once_with(command.reply, bot.pool)
+
+    async def test_ResolveCommand_WhenRaffleExists_ShouldResolveAndClearRaffle(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        active_raffle = Raffle()
+        active_raffle.resolve = AsyncMock()
+        raffle_module.raffle = active_raffle
+        commands = raffle_module.make_commands(bot)
+
+        await commands["resolve"](command)
+
+        active_raffle.resolve.assert_awaited_once_with(command.reply)
+        self.assertIsNone(raffle_module.raffle)
+        self.assertEqual(command.replies, ["The current raffle has been resolved!"])
+
+    async def test_DebugNewTablesCommand_WhenUserIsSuperadmin_ShouldCreateTables(self):
+        bot = FakeBot()
+        command = FakeCommand()
+        commands = raffle_module.make_commands(bot)
+
+        await commands["debugnewtables"](command)
+
+        self.assertEqual(command.replies, ["Tables created."])
+        func, args = bot.db_calls[0]
+        self.assertIs(func, raffle_module.postgres.debug_create_new_tables)
+        self.assertEqual(args, (bot.pool,))
