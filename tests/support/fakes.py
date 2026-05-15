@@ -2,6 +2,7 @@ class FakeBot:
     def __init__(self):
         self.pool = object()
         self.twitch = object()
+        self.winners = []
         self.db_calls = []
 
     async def queue_db(self, func, *args):
@@ -31,3 +32,11 @@ class FakeCloseablePool:
 
     async def close(self):
         self.closed = True
+
+
+class MessageRecorder:
+    def __init__(self):
+        self.messages = []
+
+    async def __call__(self, message):
+        self.messages.append(message)
