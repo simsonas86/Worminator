@@ -12,6 +12,28 @@ from raffle import Raffle
 
 
 class RaffleFunctionalTests(unittest.IsolatedAsyncioTestCase):
+    async def test_RaffleFlow_WhenEntriesAndClaimsResolveWinner_ShouldRecordWinnerAndCreditLosersAndClaimers(self):
+        raffle = Raffle(ticket_amt=1)
+        raffle.open = True
+        raffle.bot = FakeBot()
+        raffle.pool = object()
+        messages = MessageRecorder()
+
+        await raffle.enter(1, "alice", messages)
+        await raffle.enter(2, "bob", messages)
+        await raffle.claim(3, "cora", messages)
+
+        with patch.object(raffle, "draw", new=AsyncMock(return_value=(1, "alice"))):
+            await raffle.close(messages, raffle.pool)
+
+        await raffle.resolve(messages)
+
+        self.assertEqual(raffle.bot.winners, [1])
+        self.assertEqual(len(raffle.bot.db_calls), 1)
+        func, args = raffle.bot.db_calls[0]
+        self.assertIs(func, raffle_module.postgres.resolve_raffle_tickets)
+        self.assertEqual(args, (raffle.pool, (1, "alice"), [(2, "bob"), (3, "cora")], 1))
+
     async def test_RaffleFlow_WhenWinnerResolved_ShouldRecordWinnerAndCreditLosers(self):
         raffle = Raffle(ticket_amt=1)
         raffle.open = True
