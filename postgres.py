@@ -1,8 +1,3 @@
-from twitchAPI.chat import Chat, EventData, ChatMessage, ChatSub, ChatCommand
-from twitchAPI.type import AuthScope, ChatEvent
-from twitchAPI.oauth import UserAuthenticator
-from twitchAPI.twitch import Twitch
-
 import asyncio
 import os
 
@@ -89,7 +84,6 @@ async def set_user_tickets_zero(conn: asyncpg.Connection, users: list[tuple[str,
     """, insert_values)
     print(f"[DB] Ticket reset complete for {len(users)} user(s).")
 
-
 @get_conn
 async def resolve_raffle_tickets(
     conn: asyncpg.Connection,
@@ -106,12 +100,13 @@ async def resolve_raffle_tickets(
     async with conn.transaction():
         await conn.execute(
             """
-            INSERT INTO users (user_id, username, ticket_count)
-            VALUES ($1, $2, 0)
+            INSERT INTO users (user_id, username, ticket_count, times_coached)
+            VALUES ($1, $2, 0, 1)
             ON CONFLICT (user_id)
             DO UPDATE SET
                 ticket_count = 0,
-                username = EXCLUDED.username
+                username = EXCLUDED.username,
+                times_coached = users.times_coached + 1
             """,
             winner_id,
             winner_name,
@@ -139,9 +134,10 @@ async def debug_create_new_tables(conn: asyncpg.Connection):
     new_user_table = """
     DROP TABLE IF EXISTS users;
     CREATE TABLE users (
-        user_id     BIGINT PRIMARY KEY,
-        username    VARCHAR(50) NOT NULL,
-        ticket_count INT DEFAULT 0
+        user_id         BIGINT PRIMARY KEY,
+        username        VARCHAR(50) NOT NULL,
+        times_coached   INT DEFAULT 0,
+        ticket_count    INT DEFAULT 0
     );
     """
     await conn.execute(new_user_table)

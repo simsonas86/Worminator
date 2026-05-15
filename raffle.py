@@ -52,7 +52,6 @@ class Raffle:
             await send_message("Raffle already running!")
             return
         self.open = True
-        await self.load_tickets(pool)
         print(f"[Raffle] Raffle started. Duration: {self.duration}s | Ticket award: {self.ticket_amt}")
         await send_message(f"New Coaching raffle has been opened for {self.duration} seconds. !enter in Twitch Chat to enter. !claim to claim a ticket.")
         self.task = asyncio.create_task(self._run_timer(send_message))
@@ -67,7 +66,7 @@ class Raffle:
             await send_message("No entries. Raffle closed.")
             return
 
-        winner_id, winner_name = self.draw()
+        winner_id, winner_name = await self.draw()
         self.current_winner = (winner_id, winner_name)
         print(f"[Raffle] Winner drawn: {winner_name} (ID: {winner_id})")
         await send_message(f"Congratulations {winner_name}, you have been selected for coaching! Use !resolve to confirm or !redraw to pick again.")
@@ -115,14 +114,13 @@ class Raffle:
         print(f"[Raffle] {username} claimed a ticket. Total claimers: {len(self.users['Claims'])}")
         await send_message(f"{username}, you have claimed a ticket!")
 
-    def draw(self) -> tuple[int, str]:
-        raffle_pool = []
+    async def draw(self) -> tuple[int, str]:
+        await self.load_tickets(self.pool)
 
-        for user_id, username in self.users["Entries"].items():
-            ticket_count = self.tickets.get(user_id, 1)
-            raffle_pool.extend([(user_id, username)] * ticket_count)
+        entries = list(self.users["Entries"].items())
+        weights = [self.tickets.get(user_id, 1) for user_id, _ in entries]
 
-        return random.choice(raffle_pool)
+        return random.choices(entries, weights=weights, k=1)[0]
     
     async def redraw(self, send_message):
         if not self.current_winner:
@@ -134,7 +132,9 @@ class Raffle:
         self.users["Redrawn"][prev_winner_id] = prev_winner_name
         del self.users["Entries"][prev_winner_id]
 
-        winner_id, winner_name = self.draw()
+        await self.load_tickets(self.pool)
+
+        winner_id, winner_name = await self.draw()
         self.current_winner = (winner_id, winner_name)
         print(f"[Raffle] Redrawn. New winner: {winner_name} (ID: {winner_id})")
         await send_message(f"Redrawn! New winner is {winner_name}. Use !resolve to confirm or !redraw to pick again.")
@@ -206,10 +206,11 @@ def make_commands(bot):
         global raffle
         if not user_is_superadmin(cmd):
             return
-        if raffle or raffle.open:
-            print(f"[Command] !newraffle called by {cmd.user.name} but previous raffle not resolved. Run !resolve before starting new raffle.")
-            await cmd.reply("Please resolve the current raffle first!")
-            return
+        if raffle:
+            if raffle.open:
+                print(f"[Command] !newraffle called by {cmd.user.name} but previous raffle not resolved. Run !resolve before starting new raffle.")
+                await cmd.reply("Please resolve the current raffle first!")
+                return
         duration = cmd.parameter.strip()
         if not duration or not duration.isdigit():
             print(f"[Command] !newraffle called by {cmd.user.name} with invalid duration: '{cmd.parameter}'")
@@ -278,7 +279,7 @@ def make_commands(bot):
         if not user_is_superadmin(cmd):
             return
         print(f"[Command] !redraw called by {cmd.user.name}.")
-        await raffle.redraw(cmd.reply)
+        await raffle.redraw(cmd.reply, bot.pool)
 
     async def resolve_command(cmd: ChatCommand):
         global raffle
@@ -384,7 +385,3 @@ def make_commands(bot):
         "debugdroptables": drop_tables_command,
         "debugnewtables": new_tables_command,
     }
-
-# ONCE RAFFLE IS LIVE, OBS SCENE UPDATED W/ TIMER. ALSO RUN ADS DURING THIS TIME.
-# A NEW STUDENT HAS ARRIVED! - MOTION GRAPHIC OVERLAY!
-# Fetch UserID
