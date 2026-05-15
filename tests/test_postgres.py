@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import AsyncMock, patch
 
 from tests.support.dependency_stubs import install_test_environment
 from tests.support.db_fakes import FakeConnection, FakePool
@@ -10,6 +11,25 @@ import postgres
 
 
 class PostgresTests(unittest.IsolatedAsyncioTestCase):
+    async def test_CreatePool_WhenCalled_ShouldCreateAsyncpgPoolWithConfiguredSettings(self):
+        pool = object()
+
+        with patch("postgres.asyncpg.create_pool", new=AsyncMock(return_value=pool), create=True) as create_pool:
+            result = await postgres.create_pool()
+
+        self.assertIs(result, pool)
+        create_pool.assert_awaited_once_with(
+            user=postgres.DB_USER,
+            password=postgres.DB_PASSWORD,
+            database=postgres.DB_DATABASE,
+            host=postgres.DB_HOST,
+            port=postgres.DB_PORT,
+            min_size=1,
+            max_size=10,
+            command_timeout=10,
+            timeout=10,
+        )
+
     async def test_GetConn_WhenWrappedFunctionRaises_ShouldReraiseException(self):
         expected_error = RuntimeError("database failure")
 
@@ -38,6 +58,14 @@ class PostgresTests(unittest.IsolatedAsyncioTestCase):
         tickets = await postgres.get_user_tickets(FakePool(connection), 1)
 
         self.assertEqual(tickets, 0)
+
+    async def test_GetUserTickets_WhenUserExists_ShouldReturnTicketCount(self):
+        connection = FakeConnection()
+        connection.fetchrow_result = {"ticket_count": 7}
+
+        tickets = await postgres.get_user_tickets(FakePool(connection), 1)
+
+        self.assertEqual(tickets, 7)
 
     async def test_UpdateUserTickets_WhenUsersProvided_ShouldUpsertTicketCredits(self):
         connection = FakeConnection()
