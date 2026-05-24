@@ -377,6 +377,4 @@ def make_commands(bot):
         "claim": claim_command,
         "addticket": add_ticket_command,
         "mytickets": my_ticket_command,
-        "debugdroptables": drop_tables_command,
-        "debugnewtables": new_tables_command,
     }
