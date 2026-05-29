@@ -326,16 +326,30 @@ def make_commands(bot):
         await raffle.claim(int(cmd.user.id), cmd.user.name, cmd.reply)
 
     async def add_ticket_command(cmd: ChatCommand):
+        """
+        Register addticket command in twitch. Takes username and a ticket amount. 
+        If ticket amount is unspecified, it adds 1 ticket to the specified user.. 
+        """
         if not user_is_superadmin(cmd):
             return
         print(f"[Command] !addticket called by {cmd.user.name}.")
 
         parts = cmd.parameter.strip().split()
-        if len(parts) != 2 or not parts[1].isdigit():
-            await cmd.reply("Usage: !addticket USERNAME ticket_amt")
+        
+        # if addticket called with no username or ticket_amt or 3+ parameters, return error
+        if len(parts) < 1 or len(parts) > 2:
+            await cmd.reply("Usage: !addticket <USERNAME> [ticket_amt|1]")
+            return
+        
+        # if it is [username, ticket_amt] but ticket_amt not a digit, return error
+        if len(parts) == 2 and not parts[1].isdigit():
+            await cmd.reply("Usage: !addticket <USERNAME> [ticket_amt|1]")
             return
 
-        username, credit_amount = parts[0], int(parts[1])
+        username = parts[0]
+        credit_amount = 1
+        if len(parts) > 1:
+            credit_amount = int(parts[1])
 
         twitch_id = await get_twitch_user_id(username, bot.twitch)
         if twitch_id is None:
