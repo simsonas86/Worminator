@@ -4,10 +4,14 @@ class FakeBot:
         self.twitch = object()
         self.winners = []
         self.db_calls = []
+        self.overlay_states = []
 
     async def queue_db(self, func, *args):
         self.db_calls.append((func, args))
         return None
+
+    async def publish_overlay_state(self, state):
+        self.overlay_states.append(state)
 
 
 class FakeUser:
