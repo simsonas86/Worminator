@@ -177,6 +177,7 @@ class Raffle:
     def cancel(self):
         self.open = False
         self.end_timestamp = None
+        self.current_winner = None
         if self.task:
             self.task.cancel()
         print("[Raffle] Raffle has been cancelled.")
