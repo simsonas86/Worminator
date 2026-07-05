@@ -11,6 +11,7 @@ import os
 
 import raffle
 import postgres
+from overlay_ws import OverlayBroadcaster
 from postgres import create_pool
 
 load_dotenv()
@@ -35,6 +36,7 @@ class Worminator:
         self.chat = None
         self.raffle = None
         self.winners = []
+        self.overlay = OverlayBroadcaster()
 
         self.db_queue = asyncio.Queue()
         self.db_worker_task = None
@@ -75,6 +77,13 @@ class Worminator:
             await self.pool.close()
             self.pool = None
 
+        if self.overlay:
+            await self.overlay.stop()
+
+    async def publish_overlay_state(self, state):
+        if self.overlay:
+            await self.overlay.set_state(state)
+
     async def on_ready(self, ready_event: EventData):
         await ready_event.chat.join_room(TARGET_CHANNEL)
 
@@ -99,10 +108,11 @@ class Worminator:
         for name, handler in raffle_commands.items():
             self.chat.register_command(name, handler)
 
+        await self.overlay.start()
         self.chat.start()
 
         try:
-            input("Worminator is online. Press ENTER to stop...\n")
+            await asyncio.to_thread(input, "Worminator is online. Press ENTER to stop...\n")
         finally:
             self.chat.stop()
             await self.stop()
