@@ -54,6 +54,8 @@ class Raffle:
         }
 
     async def emit_overlay_state(self):
+        if self.bot is None:
+            return
         await self.bot.publish_overlay_state(self.overlay_state())
 
     async def _run_timer(self, send_message, pool):
