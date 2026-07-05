@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Worminator</title>
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+<div class="overlay is-open" id="waiting-overlay">
+    <div>
+        <div class="title">WAITING FOR</div>
+        <div class="title">WORMINATOR</div>
+    </div>
+</div>
+<div class="overlay" id="raffle-overlay">
+    <div>
+        <div class="title">RAFFLE OPEN!</div>
+        <div class="stats">
+            <div class="stat">
+                <span class="icon">
+                    <svg class="lucide lucide-notebook-pen-icon lucide-notebook-pen" fill="none" height="24"
+                         stroke="currentColor"
+                         stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"
+                         width="24" xmlns="http://www.w3.org/2000/svg"><path
+                            d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path
+                            d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path
+                            d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>
+                </span>
+                <span id="entry-count">0</span>
+            </div>
+            <div class="stat">
+                <span class="icon">
+                    <svg class="lucide lucide-ticket-icon lucide-ticket" fill="none" height="24" stroke="currentColor"
+                         stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"
+                         width="24" xmlns="http://www.w3.org/2000/svg"><path
+                            d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path
+                            d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+                </span>
+                <span id="claim-count">0</span>
+            </div>
+        </div>
+    </div>
+    <div class="timer" id="timer">0:00</div>
+</div>
+<div class="overlay" id="winner-overlay">
+    <div>
+        <div class="title">WINNER:</div>
+        <div class="title" id="winner-name"></div>
+    </div>
+</div>
+<script src="index.js"></script>
+</body>
+</html>
