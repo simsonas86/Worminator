@@ -64,13 +64,15 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_AddTicketCommand_WhenInputInvalid_ShouldReplyWithUsage(self):
         bot = FakeBot()
-        command = FakeCommand(parameter="alice")
         commands = raffle_module.make_commands(bot)
+        usage = "Usage: !addticket <USERNAME> [ticket_amt|1]"
 
-        await commands["addticket"](command)
-
-        self.assertEqual(command.replies, ["Usage: !addticket USERNAME ticket_amt"])
-        self.assertEqual(bot.db_calls, [])
+        for parameter in ("", "alice abc", "alice 5 extra"):
+            with self.subTest(parameter=parameter):
+                command = FakeCommand(parameter=parameter)
+                await commands["addticket"](command)
+                self.assertEqual(command.replies, [usage])
+                self.assertEqual(bot.db_calls, [])
 
     async def test_MyTicketsCommand_WhenTwitchUserUnresolved_ShouldNotReadDatabase(self):
         bot = FakeBot()
@@ -99,16 +101,6 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         commands = raffle_module.make_commands(bot)
 
         await commands["addticket"](command)
-
-        self.assertEqual(command.replies, [])
-        self.assertEqual(bot.db_calls, [])
-
-    async def test_DebugDropTablesCommand_WhenUserIsNotSuperadmin_ShouldNotDropTables(self):
-        bot = FakeBot()
-        command = FakeCommand(user_id=999, name="viewer")
-        commands = raffle_module.make_commands(bot)
-
-        await commands["debugdroptables"](command)
 
         self.assertEqual(command.replies, [])
         self.assertEqual(bot.db_calls, [])
@@ -157,6 +149,20 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         func, args = bot.db_calls[0]
         self.assertIs(func, raffle_module.postgres.update_user_tickets)
         self.assertEqual(args, (bot.pool, [(77, "alice")], 5))
+
+    async def test_AddTicketCommand_WhenTicketAmountOmitted_ShouldDefaultToOne(self):
+        bot = FakeBot()
+        command = FakeCommand(parameter="alice")
+        commands = raffle_module.make_commands(bot)
+
+        with patch("raffle.get_twitch_user_id", new=AsyncMock(return_value=77)):
+            await commands["addticket"](command)
+
+        self.assertEqual(command.replies, ["Added 1 ticket(s) to alice!"])
+        self.assertEqual(len(bot.db_calls), 1)
+        func, args = bot.db_calls[0]
+        self.assertIs(func, raffle_module.postgres.update_user_tickets)
+        self.assertEqual(args, (bot.pool, [(77, "alice")], 1))
 
     async def test_MyTicketsCommand_WhenTwitchUserResolved_ShouldReadDatabase(self):
         bot = FakeBot()
@@ -305,27 +311,3 @@ class RaffleCommandTests(unittest.IsolatedAsyncioTestCase):
         await commands["resolve"](command)
 
         self.assertEqual(command.replies, ["There is no raffle right now!"])
-
-    async def test_DebugDropTablesCommand_WhenUserIsSuperadmin_ShouldDropTables(self):
-        bot = FakeBot()
-        command = FakeCommand()
-        commands = raffle_module.make_commands(bot)
-
-        await commands["debugdroptables"](command)
-
-        self.assertEqual(command.replies, ["All tables dropped."])
-        func, args = bot.db_calls[0]
-        self.assertIs(func, raffle_module.postgres.debug_drop_all_tables)
-        self.assertEqual(args, (bot.pool,))
-
-    async def test_DebugNewTablesCommand_WhenUserIsSuperadmin_ShouldCreateTables(self):
-        bot = FakeBot()
-        command = FakeCommand()
-        commands = raffle_module.make_commands(bot)
-
-        await commands["debugnewtables"](command)
-
-        self.assertEqual(command.replies, ["Tables created."])
-        func, args = bot.db_calls[0]
-        self.assertIs(func, raffle_module.postgres.debug_create_new_tables)
-        self.assertEqual(args, (bot.pool,))

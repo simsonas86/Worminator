@@ -130,23 +130,3 @@ class PostgresTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(connection.executemany_calls), 1)
         _, values = connection.executemany_calls[0]
         self.assertEqual(values, [(2, "bob", 3)])
-
-    async def test_DebugCreateNewTables_WhenCalled_ShouldExecuteUsersTableDdl(self):
-        connection = FakeConnection()
-
-        await postgres.debug_create_new_tables(FakePool(connection))
-
-        self.assertEqual(len(connection.operations), 1)
-        operation, query, args = connection.operations[0]
-        self.assertEqual(operation, "execute")
-        self.assertEqual(args, ())
-        self.assertIn("DROP TABLE IF EXISTS users", query)
-        self.assertIn("CREATE TABLE users", query)
-        self.assertIn("times_coached", query)
-
-    async def test_DebugDropAllTables_WhenCalled_ShouldDropUsersTable(self):
-        connection = FakeConnection()
-
-        await postgres.debug_drop_all_tables(FakePool(connection))
-
-        self.assertEqual(connection.operations, [("execute", "DROP TABLE IF EXISTS users;", ())])
