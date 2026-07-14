@@ -1,3 +1,4 @@
+import time
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -29,6 +30,7 @@ class RaffleTests(unittest.IsolatedAsyncioTestCase):
         pool = object()
         timer_calls = []
         raffle.task = current_task
+        raffle.end_timestamp = time.time() + raffle.duration
         raffle.send_message = messages
         raffle.pool = pool
 
@@ -43,7 +45,7 @@ class RaffleTests(unittest.IsolatedAsyncioTestCase):
             raffle.extend(30)
 
         self.assertTrue(current_task.cancelled)
-        self.assertEqual(raffle.duration, 30)
+        self.assertEqual(raffle.duration, 39)
         self.assertEqual(timer_calls, [(messages, pool)])
         self.assertIs(raffle.task, new_task)
 
