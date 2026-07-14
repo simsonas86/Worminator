@@ -90,10 +90,7 @@ async def resolve_raffle_tickets(conn: asyncpg.Connection,
                                  users_to_credit: list[tuple[int, str]],
                                  ticket_amt: int) -> None:
     winner_id, winner_name = winner if winner else (None, None)
-    print(
-        f"[DB] Resolving raffle tickets atomically. Winner: {winner_name} ({winner_id}) "
-        f"| Credit users: {len(users_to_credit)} | Credit amount: {ticket_amt}"
-    )
+    print(f"[DB] Resolving raffle tickets atomically. Winner: {winner_name} ({winner_id}) ")
 
     async with conn.transaction():
         if winner:
