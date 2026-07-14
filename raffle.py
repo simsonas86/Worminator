@@ -7,6 +7,7 @@ import asyncio
 import csv
 import random
 import os
+import time
 from dotenv import load_dotenv
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,7 @@ class Raffle:
         self.duration = int(duration)
         self.ticket_amt = ticket_amt
         self.open = False
+        self.end_timestamp = None
         self.users = {
             "Entries" : {}, #user_id: username
             "Claims" : {}, #user_id: username 
@@ -35,6 +37,26 @@ class Raffle:
         self.current_winner = None
         self.bot = None
         self.redrawn = []
+
+    def overlay_state(self):
+        winner_id, winner_name = self.current_winner or (None, None)
+
+        return {
+            "open": self.open,
+            "entries": len(self.users["Entries"]),
+            "claims": len(self.users["Claims"]),
+            "end_timestamp": self.end_timestamp,
+            "winner": (
+                {"id": winner_id, "username": winner_name}
+                if self.current_winner
+                else None
+            ),
+        }
+
+    async def emit_overlay_state(self):
+        if self.bot is None:
+            return
+        await self.bot.publish_overlay_state(self.overlay_state())
 
     async def _run_timer(self, send_message, pool):
         for remaining in range(self.duration, 0, -1):
@@ -52,24 +74,29 @@ class Raffle:
             await send_message("Raffle already running!")
             return
         self.open = True
+        self.end_timestamp = time.time() + self.duration
         print(f"[Raffle] Raffle started. Duration: {self.duration}s | Ticket award: {self.ticket_amt}")
         await send_message(f"New Coaching raffle has been opened for {self.duration} seconds. !enter in Twitch Chat to enter. !claim to claim a ticket.")
         self.task = asyncio.create_task(self._run_timer(send_message, pool))
+        await self.emit_overlay_state()
 
     async def close(self, send_message, pool: asyncpg.Pool):
         if not self.open:
             return
         self.open = False
+        self.end_timestamp = None
 
         if not self.users["Entries"]:
             print("[Raffle] Raffle closed with no entries.")
             await send_message("No entries. Raffle closed.")
+            await self.emit_overlay_state()
             return
 
         winner_id, winner_name = await self.draw(pool)
         self.current_winner = (winner_id, winner_name)
         print(f"[Raffle] Winner drawn: {winner_name} (ID: {winner_id})")
         await send_message(f"Congratulations {winner_name}, you have been selected for coaching! Use !resolve to confirm or !redraw to pick again.")
+        await self.emit_overlay_state()
 
     async def enter(self, user_id: int, username: str, send_message):
         if not self.open:
@@ -91,12 +118,14 @@ class Raffle:
             self.users["Entries"][user_id] = username
             print(f"[Raffle] {username} moved from Claims to Entries.")
             await send_message(f"{username}, you have been moved into the raffle!")
+            await self.emit_overlay_state()
             return
 
         self.users["Entries"][user_id] = username
         print(f"[Raffle] {username} entered the raffle. Total entries: {len(self.users['Entries'])}")
         await send_message(f"{username}, you have entered the raffle!")
-                
+        await self.emit_overlay_state()
+
     async def claim(self, user_id: int, username: str, send_message):
         if user_id in self.users["Claims"]:
             print(f"[Raffle] {username} tried to claim but already has a ticket.")
@@ -108,11 +137,13 @@ class Raffle:
             self.users["Claims"][user_id] = username
             print(f"[Raffle] {username} moved from Entries to Claims.")
             await send_message(f"{username}, you have claimed your ticket and have been removed from the raffle!")
+            await self.emit_overlay_state()
             return
 
         self.users["Claims"][user_id] = username
         print(f"[Raffle] {username} claimed a ticket. Total claimers: {len(self.users['Claims'])}")
         await send_message(f"{username}, you have claimed a ticket!")
+        await self.emit_overlay_state()
 
     async def draw(self, pool: asyncpg.pool) -> tuple[int, str]:
         await self.load_tickets(pool)
@@ -136,15 +167,19 @@ class Raffle:
             self.current_winner = None
             print("[Raffle] Redraw attempted but there is no eligible entries remaining. Resolve recommended.")
             await send_message("No eligible entries remaining to redraw from.")
+            await self.emit_overlay_state()
             return
 
         winner_id, winner_name = await self.draw(pool)
         self.current_winner = (winner_id, winner_name)
         print(f"[Raffle] Redrawn. New winner: {winner_name} (ID: {winner_id})")
         await send_message(f"Redrawn! New winner is {winner_name}. Use !resolve to confirm or !redraw to pick again.")
+        await self.emit_overlay_state()
 
     def cancel(self):
         self.open = False
+        self.end_timestamp = None
+        self.current_winner = None
         if self.task:
             self.task.cancel()
         print("[Raffle] Raffle has been cancelled.")
@@ -152,8 +187,10 @@ class Raffle:
     def extend(self, additional_seconds=60):
         if self.task:
             self.task.cancel()
-        self.duration = additional_seconds
-        print(f"[Raffle] Raffle extended. New duration: {additional_seconds}s")
+        remaining_duration = max(0, int(self.end_timestamp - time.time()))
+        self.duration = remaining_duration + additional_seconds
+        self.end_timestamp = time.time() + self.duration
+        print(f"[Raffle] Raffle extended by {additional_seconds}s. New duration: {self.duration}s")
         self.task = asyncio.create_task(self._run_timer(self.send_message, self.pool))
 
     async def load_tickets(self, pool: asyncpg.Pool):
@@ -180,6 +217,9 @@ class Raffle:
                 self.ticket_amt
             )
             await send_message("No winner, tickets awarded to all participants.")
+            self.open = False
+            self.end_timestamp = None
+            await self.emit_overlay_state()
             return
 
         winner_id, winner_name = self.current_winner
@@ -213,6 +253,12 @@ class Raffle:
         
         self.bot.winners.append(winner_id)
         print(f"[Raffle] Resolved. Winner: {winner_name} | Losers awarded tickets: {len(losers)} | Claimers awarded tickets: {len(claimers)}")
+
+        self.open = False
+        self.end_timestamp = None
+        self.current_winner = None
+        await self.emit_overlay_state()
+
 
 raffle: Raffle | None = None
 
@@ -256,6 +302,7 @@ def make_commands(bot):
 
         print(f"[Command] !extend called by {cmd.user.name}. Extending by {seconds}s")
         raffle.extend(int(seconds))
+        await bot.publish_overlay_state(raffle.overlay_state())
         await cmd.reply(f"Raffle extended by {seconds} seconds!")
 
     async def clear_command(cmd: ChatCommand):
@@ -267,6 +314,7 @@ def make_commands(bot):
         raffle.users["Entries"].clear()
         raffle.users["Claims"].clear()
         print(f"[Command] !clear called by {cmd.user.name}. All entries and claims cleared.")
+        await bot.publish_overlay_state(raffle.overlay_state())
         await cmd.reply("Raffle entries and claims have been cleared.")
 
     async def cancel_command(cmd: ChatCommand):
@@ -278,6 +326,7 @@ def make_commands(bot):
             return
         print(f"[Command] !cancel called by {cmd.user.name}.")
         raffle.cancel()
+        await bot.publish_overlay_state(raffle.overlay_state())
         raffle = None
         await cmd.reply("Raffle has been cancelled.")
 
