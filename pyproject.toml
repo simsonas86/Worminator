@@ -1,7 +1,7 @@
 [project]
 name = "worminator"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 dependencies = [
     "aiohttp==3.13.2",
     "asyncpg==0.31.0",
