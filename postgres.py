@@ -1,27 +1,20 @@
-import os
-
 import asyncpg
-from dotenv import load_dotenv
 
-load_dotenv()
-
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_DATABASE = os.getenv("DB_DATABASE")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = int(os.getenv("DB_PORT"))
-
-SUPERADMIN_ID = os.getenv("TWITCHSUPERADMINID")
+from settings import settings
 
 
 async def create_pool() -> asyncpg.Pool:
-    print(f"[DB] Creating connection pool (host={DB_HOST}, db={DB_DATABASE}, user={DB_USER})...")
-    connection_pool = await asyncpg.create_pool(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_DATABASE,
-        host=DB_HOST,
-        port=DB_PORT,
+    print(
+        f"[DB] Creating connection pool "
+        f"(host={settings.db_host}, db={settings.db_database}, user={settings.db_user})..."
+    )
+
+    connection_pool = await asyncpg.create_pool(  # type: ignore
+        user=settings.db_user,
+        password=settings.db_password.get_secret_value(),
+        database=settings.db_database,
+        host=settings.db_host,
+        port=settings.db_port,
         min_size=1,
         max_size=10,
         command_timeout=10,

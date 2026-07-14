@@ -1,17 +1,13 @@
 import asyncio
-import os
 import random
 import time
 
 import asyncpg
-from dotenv import load_dotenv
 from twitchAPI.chat import ChatCommand
 
 import postgres
+from settings import settings
 from utils import get_twitch_user_id
-
-load_dotenv()
-SUPERADMIN_ID = int(os.getenv("TWITCHSUPERADMINID", "0"))
 
 
 class Raffle:
@@ -248,7 +244,7 @@ raffle: Raffle | None = None
 
 
 def user_is_superadmin(cmd: ChatCommand) -> bool:
-    return int(cmd.user.id) == SUPERADMIN_ID
+    return int(cmd.user.id) == settings.twitch_superadmin_id
 
 
 def make_commands(bot):

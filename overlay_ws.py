@@ -1,10 +1,9 @@
 import asyncio
 import json
-import os
 
 from aiohttp import web
 
-WEBSOCKET_DISABLED = os.getenv("WORMINATOR_WS_DISABLED", "").strip().lower() == "true"
+from settings import settings
 
 
 class OverlayBroadcaster:
@@ -45,7 +44,7 @@ class OverlayBroadcaster:
         return ws
 
     async def start(self):
-        if WEBSOCKET_DISABLED:
+        if settings.overlay_ws_disabled:
             print("[OVERLAY] WebSocket server disabled by environment.")
             return
 
